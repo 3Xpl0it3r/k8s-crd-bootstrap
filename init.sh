@@ -11,39 +11,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Project=$1
+# ProjectName is directory of project
+ProjectName=$1
 Version=$2
 Author=$3
-Domain="$Author.cn"
+
+
+ProjectAddress="github.com/$Author/$ProjectName"
+# exampleoperator.l0calh0st.cn
+GroupName=$(echo $ProjectName|sed 's/-//'|sed 's/_//').$Author.cn
+# exampleoperator
+GroupNameForShort=$(echo $ProjectName|sed 's/-//'|sed 's/_//')
+
+# CRD type
+CrdType=`echo $(echo $ProjectName|awk -F'-' '{print $1}'|awk -F'_' '{print $1}')|awk '{print toupper(substr($0,1,1))substr($0,2)}'`
+CrdSpec=$CrdType"Spec"
+CrdStatus=$CrdType"Status"
+CrdList=$CrdType"List"
+
 if [ "$Version" = "" ]
 then
     Version="v1alpha1"
 fi
 
+if [ "$Author" = "" ]
+then
+    Author="l0calh0st"
+fi
 
-# GroupName=$(echo $PROJECT|awk -F'-' '{print $1}'|awk -F'_' '{print $1}').$Domain
-GroupName=$(echo $Project|sed 's/-//'|sed 's/_//').$Domain
-GroupNameForShort=$(echo $Project|sed 's/-//'|sed 's/_//')
 
-
-CustomResName=$(echo $Project|awk -F'-' '{print $1}'|awk -F'_' '{print $1}')
-
+function mod_name()
+{
+    echo "github.con/$Author/$Project"
+}
 
 # create project directory
-mkdir -pv $Project
-mkdir -pv $Project/hack
-mkdir -pv $Project/pkg/apis/$GroupName/$Version
-mkdir -pv $Project/pkg/client
+mkdir -pv $ProjectName
+mkdir -pv $ProjectName/hack
+mkdir -pv $ProjectName/pkg/apis/$GroupName/$Version
+mkdir -pv $ProjectName/pkg/client
 
 
 # create boilerplate.go.txt tools.go update-group.sh
-cat >> $Project/hack/boilerplate.go.txt << EOF
+cat >> $ProjectName/hack/boilerplate.go.txt << EOF
 /*
-Copyright The $Project Authors.
+Copyright The $ProjectName Authors.
 */
 EOF
 
-cat >> $Project/hack/tools.go << EOF
+cat >> $ProjectName/hack/tools.go << EOF
 // +build tools
 
 package tools
@@ -52,7 +68,7 @@ import _ "k8s.io/code-generator"
 EOF
 
 
-cat >> $Project/hack/update-group.sh << EOF
+cat >> $ProjectName/hack/update-group.sh << EOF
 #!/usr/bin/env bash
 
 set -o errexit
@@ -73,7 +89,7 @@ echo "Generating deepcopy funcs"
 "\${gobin}/deepcopy-gen" -O zz_generated.deepcopy  --go-header-file ./boilerplate.go.txt --bounding-dirs ../pkg/apis/$GroupName/$Version --input-dirs ../pkg/apis/$GroupName/$Version --output-base ./ 
 
 echo "Generating clientset for $GroupName "
-"\${gobin}/client-gen" --clientset-name versioned --go-header-file ./boilerplate.go.txt --input-dirs ../pkg/apis/$GroupName/$Version --output-base ../  --output-package pkg/client/clientset 
+"\${gobin}/client-gen" --clientset-name versioned --go-header-file ./boilerplate.go.txt   --input-base "$ProjectAddress" --input "$GroupName/$Version" --input-dirs ../pkg/apis/$GroupName/$Version --output-base ../  --output-package pkg/client/clientset 
 
 
 echo "Generating listers for $GroupName "
@@ -83,16 +99,17 @@ echo "Generating listers for $GroupName "
 echo "Generating informers for $GroupName "
 "\${gobin}/informer-gen" --go-header-file ./boilerplate.go.txt --input-dirs ../pkg/apis/$GroupName/$Version --output-package pkg/client/informers --output-base ../  --listers-package ../pkg/client/listers --versioned-clientset-package ../pkg/client/clientset/versioned 
 
+
 EOF
 
-chmod +x $Project/hack/update-group.sh
+chmod +x $ProjectName/hack/update-group.sh
 
 # create apis
 
 # auto generate regisgter.go file
-cat >> $Project/pkg/apis/$GroupName/register.go << EOF
+cat >> $ProjectName/pkg/apis/$GroupName/register.go << EOF
 /*
-Copyright `date "+%Y"` The $Project Authors.
+Copyright `date "+%Y"` The $ProjectName Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -112,9 +129,9 @@ const (
 EOF
 
 # auto generate doc.go
-cat >> $Project/pkg/apis/$GroupName/$Version/doc.go << EOF
+cat >> $ProjectName/pkg/apis/$GroupName/$Version/doc.go << EOF
 /*
-Copyright `date "+%Y"` The $Project Authors.
+Copyright `date "+%Y"` The $ProjectName Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -130,18 +147,15 @@ limitations under the License.
 // +groupName=$GroupName
 
 // Package $Version is the $Version version of the API.
-package $Version // import "$GroupName/pkg/apis/$GroupName/$Version"
+package $Version // import "$ProjectAddress/pkg/apis/$GroupName/$Version"
 
 
 EOF
 
 # auto geneate types.go
-_Spec=$CustomResName"Spec"
-_Status=$CustomResName"Status"
-_List=$CustomResName"Itemm"
-cat >> $Project/pkg/apis/$GroupName/$Version/types.go << EOF
+cat >> $ProjectName/pkg/apis/$GroupName/$Version/types.go << EOF
 /*
-Copyright `date "+%Y"` The $Project Authors.
+Copyright `date "+%Y"` The $ProjectName Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -165,41 +179,41 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:defaulter-gen=true
 
-// $CustomResName represent $CustomResName cluster
-type $CustomResName struct {
+// $CrdType defines $CrdType deployment
+type $CrdType struct {
 	metav1.TypeMeta \`json:",inline"\`
 	metav1.ObjectMeta \`json:"metadata,omitempty"\`
 
-	Spec $_Spec \`json:"spec"\`
-	Status $_Status \`json:"status"\`
+	Spec $CrdSpec \`json:"spec"\`
+	Status $CrdStatus \`json:"status"\`
 }
 
 
-// $_Spec describe the behaviour of $CustomResName
-type $_Spec struct {
+// $CrdSpec describes the specification of $CrdType applications using kubernetes as a cluster manager
+type $CrdSpec struct {
     // todo, write your code
 }
 
-// $_Status represent the current status of $CustomResName cluster resource
-type $_Status struct {
+// $CrdStatus describes the current status of $CrdType applications
+type $CrdStatus struct {
     // todo, write your code
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// $_List represent a list of $CustomResName cluster
-type $_List struct {
+// $CrdList carries a list of $CrdType objects
+type $CrdList struct {
 	metav1.TypeMeta \`json:",inline"\`
 	metav1.ListMeta \`json:"metadata,omitempty"\`
 
-	Items []$CustomResName \`json:"items"\`
+	Items []$CrdType \`json:"items"\`
 }
 EOF
 
 # generate regiser.go
-cat >> $Project/pkg/apis/$GroupName/$Version/register.go << EOF
+cat >> $ProjectName/pkg/apis/$GroupName/$Version/register.go << EOF
 /*
-Copyright `date "+%Y"` The $Project Authors.
+Copyright `date "+%Y"` The $ProjectName Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -214,10 +228,11 @@ limitations under the License.
 package $Version
 
 import (
+    "$ProjectAddress/pkg/apis/$GroupName"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-    "$GroupName/pkg/apis/$GroupName"
 )
 
 const (
@@ -249,15 +264,17 @@ func Kind(kind string)schema.GroupKind{
 // addKnownTypes adds the set of types defined in this package to the supplied scheme.
 func addKnowTypes(scheme *runtime.Scheme)error{
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		new($CustomResName),
-        new($_List),)
+		new($CrdType),
+        new($CrdList),)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
 EOF
 
-# init go mod
-cd $Project && go mod init $GroupName && go mod tidy
-
 # go mod vendor
-export GOPROXY=https://goproxy.cn && go mod vendor
+export GOPROXY=https://goproxy.cn 
+
+
+# init go mod
+cd $ProjectName && go mod init  $ProjectAddress  && go mod tidy && go mod vendor
+cd hack &&  bash update-group.sh

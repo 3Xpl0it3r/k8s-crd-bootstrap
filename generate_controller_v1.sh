@@ -23,7 +23,6 @@ GIT_DOMAIN="github.com"
 GROUP_NAME=$(echo ${PROJECT_NAME}|sed 's/-//'|sed 's/_//').${PROJECT_AUTHOR}.cn
 # exampleoperator
 GROUP_PACKAGE_NAME=$(echo ${PROJECT_NAME}|sed 's/-//'|sed 's/_//')
-PROJECT_CMD_NAME=$(echo ${PROJECT_NAME}|sed 's/-//'|sed 's/_//')
 
 # CRD type
 CRKind=$(echo $(echo ${PROJECT_NAME}|awk -F'-' '{print $1}'|awk -F'_' '{print $1}')|awk '{print toupper(substr($0,1,1))substr($0,2)}')
@@ -54,7 +53,7 @@ function fn_project_module()
 }
 
 # create project directory
-mkdir -pv ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}
+mkdir -pv ${PROJECT_NAME}/pkg/apis/
 mkdir -pv ${PROJECT_NAME}/pkg/client
 
 
@@ -63,181 +62,181 @@ mkdir -pv ${PROJECT_NAME}/pkg/client
 #                         GENGROUPS SECTION                                  #
 ##############################################################################
 
+function fn_generate_apigroups()
+{
+    mkdir -pv ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}
+    # auto generate regisgter.go file
+    cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/register.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
 
-# auto generate regisgter.go file
-cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/register.go << EOF
-/*
-Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
-Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+    package ${GROUP_PACKAGE_NAME}
 
-package ${GROUP_PACKAGE_NAME}
-
-const (
-	GroupName = "${GROUP_NAME}"
-)
+    const (
+        GroupName = "${GROUP_NAME}"
+    )
 EOF
 
-# auto generate doc.go
-cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/doc.go << EOF
-/*
-Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
-Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+    # auto generate doc.go
+    cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/doc.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
 
-// +k8s:deepcopy-gen=package
-// +groupName=${GROUP_NAME}
+    // +k8s:deepcopy-gen=package
+    // +groupName=${GROUP_NAME}
 
-// Package ${PROJECT_VERSION} is the ${PROJECT_VERSION} version of the API.
-package ${PROJECT_VERSION} // import "$(fn_project_module)/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}"
-
-
+    // Package ${PROJECT_VERSION} is the ${PROJECT_VERSION} version of the API.
+    package ${PROJECT_VERSION} // import "$(fn_project_module)/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}"
 EOF
 
-# auto geneate types.go
-cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/types.go << EOF
-/*
-Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
-Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 
+    # auto geneate types.go
+    cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/types.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
+    package ${PROJECT_VERSION}
 
-package ${PROJECT_VERSION}
+    import (
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    )
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+    // +genclient
+    // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+    // +k8s:defaulter-gen=true
 
+    // ${CRKind} defines ${CRKind} deployment
+    type ${CRKind} struct {
+        metav1.TypeMeta \`json:",inline"\`
+        metav1.ObjectMeta \`json:"metadata,omitempty"\`
 
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:defaulter-gen=true
+        Spec ${CRKind}Spec \`json:"spec"\`
+        Status ${CRKind}Status \`json:"status"\`
+    }
 
-// ${CRKind} defines ${CRKind} deployment
-type ${CRKind} struct {
-	metav1.TypeMeta \`json:",inline"\`
-	metav1.ObjectMeta \`json:"metadata,omitempty"\`
+    // ${CRKind}Spec describes the specification of ${CRKind} applications using kubernetes as a cluster manager
+    type ${CRKind}Spec struct {
+        // todo, write your code
+    }
 
-	Spec ${CRKind}Spec \`json:"spec"\`
-	Status ${CRKind}Status \`json:"status"\`
-}
+    // ${CRKind}Status describes the current status of ${CRKind} applications
+    type ${CRKind}Status struct {
+        // todo, write your code
+    }
 
+    // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ${CRKind}Spec describes the specification of ${CRKind} applications using kubernetes as a cluster manager
-type ${CRKind}Spec struct {
-    // todo, write your code
-}
+    // ${CRKind}List carries a list of ${CRKind} objects
+    type ${CRKind}List struct {
+        metav1.TypeMeta \`json:",inline"\`
+        metav1.ListMeta \`json:"metadata,omitempty"\`
 
-// ${CRKind}Status describes the current status of ${CRKind} applications
-type ${CRKind}Status struct {
-    // todo, write your code
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ${CRKind}List carries a list of ${CRKind} objects
-type ${CRKind}List struct {
-	metav1.TypeMeta \`json:",inline"\`
-	metav1.ListMeta \`json:"metadata,omitempty"\`
-
-	Items []$CRKind \`json:"items"\`
-}
+        Items []$CRKind \`json:"items"\`
+    }
 EOF
 
-# generate regiser.go
-cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/register.go << EOF
-/*
-Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
-Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+    # generate regiser.go
+    cat >> ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}/register.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
 
-package ${PROJECT_VERSION}
+    package ${PROJECT_VERSION}
 
-import (
-    "$(fn_project_module)/pkg/apis/${GROUP_NAME}"
+    import (
+        "$(fn_project_module)/pkg/apis/${GROUP_NAME}"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-)
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/apimachinery/pkg/runtime/schema"
+    )
 
-const (
-    Version = "${PROJECT_VERSION}"
-)
+    const (
+        Version = "${PROJECT_VERSION}"
+    )
 
-var (
-    // SchemeBuilder initializes a scheme builder
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnowTypes)
-    // AddToScheme is a global function that registers this API group & version to a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
-)
+    var (
+        // SchemeBuilder initializes a scheme builder
+        SchemeBuilder = runtime.NewSchemeBuilder(addKnowTypes)
+        // AddToScheme is a global function that registers this API group & version to a scheme
+        AddToScheme = SchemeBuilder.AddToScheme
+    )
 
-var (
-    // SchemeGroupPROJECT_VERSION is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group:  ${GROUP_PACKAGE_NAME}.GroupName, Version: Version}
-)
+    var (
+        // SchemeGroupPROJECT_VERSION is group version used to register these objects
+        SchemeGroupVersion = schema.GroupVersion{Group:  ${GROUP_PACKAGE_NAME}.GroupName, Version: Version}
+    )
 
-// Resource takes an unqualified resource and returns a Group-qualified GroupResource.
-func Resource(resource string)schema.GroupResource{
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
+    // Resource takes an unqualified resource and returns a Group-qualified GroupResource.
+    func Resource(resource string)schema.GroupResource{
+        return SchemeGroupVersion.WithResource(resource).GroupResource()
+    }
 
-// Kind takes an unqualified kind and returns back a Group qualified GroupKind
-func Kind(kind string)schema.GroupKind{
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+    // Kind takes an unqualified kind and returns back a Group qualified GroupKind
+    func Kind(kind string)schema.GroupKind{
+        return SchemeGroupVersion.WithKind(kind).GroupKind()
+    }
 
-// addKnownTypes adds the set of types defined in this package to the supplied scheme.
-func addKnowTypes(scheme *runtime.Scheme)error{
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		new(${CRKind}),
-        new(${CRKind}List),)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
-}
+    // addKnownTypes adds the set of types defined in this package to the supplied scheme.
+    func addKnowTypes(scheme *runtime.Scheme)error{
+        scheme.AddKnownTypes(SchemeGroupVersion,
+            new(${CRKind}),
+            new(${CRKind}List),)
+        metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+        return nil
+    }
 EOF
+
+}
+
 
 
 ##############################################################################
 #                         CMD       SECTION                                  #
 ##############################################################################
 # generate some helper code
-mkdir -pv ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/options
+mkdir -pv ${PROJECT_NAME}/cmd/operator/options
 
 # generate main code
-cat >> ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/main.go << EOF
+cat >> ${PROJECT_NAME}/cmd/operator/main.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -271,7 +270,7 @@ func main() {
 
 EOF
 
-cat >> ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/signals.go << EOF
+cat >> ${PROJECT_NAME}/cmd/operator/signals.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -319,7 +318,7 @@ func SetupSignalHandler() (stopCh <-chan struct{}) {
 
 EOF
 
-cat >> ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/start.go << EOF
+cat >> ${PROJECT_NAME}/cmd/operator/start.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -339,7 +338,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-    "$(fn_project_module)/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/options"
+    "$(fn_project_module)/cmd/operator/options"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -354,8 +353,8 @@ import (
 func NewStartCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := options.NewOptions()
 	cmd := &cobra.Command{
-        Short: "Launch $(fn_word_all_to_lower ${PROJECT_CMD_NAME})",
-        Long:  "Launch $(fn_word_all_to_lower ${PROJECT_CMD_NAME})",
+		Short: "Launch ${PROJECT_NAME}",
+		Long:  "Launch ${PROJECT_NAME}",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := opts.Validate(); err != nil {
 				return fmt.Errorf("Options validate failed, %v. ", err)
@@ -433,7 +432,7 @@ func serveTLS(srv *http.Server, listener net.Listener) func() error {
 
 EOF
 
-cat >> ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/options/interface.go << EOF
+cat >> ${PROJECT_NAME}/cmd/operator/options/interface.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -459,7 +458,7 @@ type options interface {
 }
 EOF
 
-cat >> ${PROJECT_NAME}/cmd/$(fn_word_all_to_lower ${PROJECT_CMD_NAME})/options/options.go << EOF
+cat >> ${PROJECT_NAME}/cmd/operator/options/options.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -972,6 +971,7 @@ echo "Generating client codes ...."
 docker run --rm -v "\${REPO_DIR}:/go/src/$(fn_project_module)" \\
         "\${IMAGE_NAME}" /bin/bash -c "\${cmd}"
 EOF
+
 }
 
 fn_generate_scripts
@@ -983,7 +983,7 @@ mkdir -pv ${PROJECT_NAME}/e2e
 cd ${PROJECT_NAME} && go mod init $(fn_project_module)  
 
 # execute upgroup.sh
-bash hack/scripts/codegen-update.sh
+# bash hack/scripts/codegen-update.sh
 
 # vendor
-go mod tidy && go mod vendor
+# go mod tidy && go mod vendor

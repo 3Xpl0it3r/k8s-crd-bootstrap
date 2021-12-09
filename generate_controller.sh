@@ -37,6 +37,15 @@ then
     PROJECT_AUTHOR="l0calh0st"
 fi
 
+function fn_word_all_to_upper()
+{
+    echo $(echo $1|tr '[:lower:]' '[:upper:]')
+}
+
+function fn_word_all_to_lower()
+{
+    echo $(echo $1|tr '[:upper:]' '[:lower:]')
+}
 
 function fn_project_module()
 {
@@ -46,6 +55,12 @@ function fn_project_module()
 # create project directory
 mkdir -pv ${PROJECT_NAME}/pkg/apis/${GROUP_NAME}/${PROJECT_VERSION}
 mkdir -pv ${PROJECT_NAME}/pkg/client
+
+
+
+##############################################################################
+#                         GENGROUPS SECTION                                  #
+##############################################################################
 
 
 # auto generate regisgter.go file
@@ -214,6 +229,9 @@ func addKnowTypes(scheme *runtime.Scheme)error{
 EOF
 
 
+##############################################################################
+#                         CMD       SECTION                                  #
+##############################################################################
 # generate some helper code
 mkdir -pv ${PROJECT_NAME}/cmd/operator/options
 
@@ -504,9 +522,9 @@ func(o *Options)NamedFlagSets()(fs flag.NamedFlagSets){
 
 EOF
 
-#############################################################
-#                CONTROLLER SECTION                         #
-#############################################################
+##############################################################################
+#                       CONTROLLER  SECTION                                  #
+##############################################################################
 
 mkdir -pv ${PROJECT_NAME}/pkg/controller
 
@@ -596,7 +614,7 @@ type Event struct {
 	Object interface{}
 }
 
-// EventsHook extends `Hook` interface.
+// EventsHook extends \`Hook\` interface.
 type EventsHook interface {
 	Hook
 	GetEventsChan() <-chan Event
@@ -692,7 +710,8 @@ package controller
 EOF
 
 # CONTROLLER_CRKIND
-cat >> ${PROJECT_NAME}/pkg/controller/${CRKind,,}/controller.go << EOF
+mkdir -pv ${PROJECT_NAME}/pkg/controller/$(fn_word_all_to_lower ${CRKind})
+cat >> ${PROJECT_NAME}/pkg/controller/$(fn_word_all_to_lower ${CRKind})/controller.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -706,10 +725,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ${CRKind,,}
+package $(fn_word_all_to_lower ${CRKind})
 EOF
 
-cat >> ${PROJECT_NAME}/pkg/controller/${CRKind,,}/collector.go << EOF
+cat >> ${PROJECT_NAME}/pkg/controller/$(fn_word_all_to_lower ${CRKind})/collector.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -723,10 +742,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ${CRKind,,}
+package $(fn_word_all_to_lower ${CRKind})
 EOF
 
-cat >> ${PROJECT_NAME}/pkg/controller/${CRKind,,}/handler.go << EOF
+cat >> ${PROJECT_NAME}/pkg/controller/$(fn_word_all_to_lower ${CRKind})/handler.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -740,10 +759,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ${CRKind,,}
+package $(fn_word_all_to_lower ${CRKind})
 EOF
 
-cat >> ${PROJECT_NAME}/pkg/controller/${CRKind,,}/informer.go << EOF
+cat >> ${PROJECT_NAME}/pkg/controller/$(fn_word_all_to_lower ${CRKind})/informer.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -757,13 +776,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ${CRKind,,}
+package $(fn_word_all_to_lower ${CRKind})
 EOF
 # generate crtype 
 
-#############################################################
-#                   OPERATOR SECTION                        # 
-#############################################################
+##############################################################################
+#                       OPERATOR    SECTION                                  #
+##############################################################################
 mkdir ${PROJECT_NAME}/pkg/operator/
 cat >> ${PROJECT_NAME}/pkg/operator/operator.go << EOF
 /*
@@ -813,8 +832,8 @@ package operator
 
 EOF
 
-mkdir ${PROJECT_NAME}/pkg/operator/${CRKind,,}
-cat >> ${PROJECT_NAME}/pkg/operator/${CRKind,,}/operator.go << EOF
+mkdir -pv  ${PROJECT_NAME}/pkg/operator/$(fn_word_all_to_lower ${CRKind})
+cat >> ${PROJECT_NAME}/pkg/operator/$(fn_word_all_to_lower ${CRKind})/operator.go << EOF
 /*
 Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
 Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
@@ -828,15 +847,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ${CRKind,,}
+package $(fn_word_all_to_lower ${CRKind})
 
 EOF
 
 
+##############################################################################
+#                       HACKER      SECTION                                  #
+##############################################################################
 
 
 # generate hackscripts
-mkdir -pv ${PROJECT_NAME}
 mkdir -pv ${PROJECT_NAME}/hack
 mkdir -pv ${PROJECT_NAME}/hack/docker ${PROJECT_NAME}/hack/scripts
 # create kubernetes builder images
@@ -896,7 +917,11 @@ EOF
 mkdir -pv ${PROJECT_NAME}/e2e
 
 # init go mod
-cd ${PROJECT_NAME} && go mod init $(fn_project_module)  && go mod tidy && go mod vendor 
+cd ${PROJECT_NAME} && go mod init $(fn_project_module)  
 
 # execute upgroup.sh
 bash hack/scripts/codegen-update.sh
+
+# vendor
+go mod tidy && go mod vendor
+# do 

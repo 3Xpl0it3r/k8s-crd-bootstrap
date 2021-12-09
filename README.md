@@ -1,6 +1,9 @@
 # k8s-crd-bootstrap
 used to bootstrap a empty k8s controller project for crd
 
+# PROJECT LAYOUT
+
+![example](./images/0x03-example.jpg)
 
 # Usage
 ```bash
@@ -124,4 +127,3 @@ example-operator
 ```
 
 
-![example](./images/0x03-example.png)

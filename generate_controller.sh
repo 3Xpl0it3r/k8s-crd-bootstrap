@@ -1015,7 +1015,7 @@ function fn_gen_package_pkg_controller_CRKind() {
       c.cacheSynced = func() bool {
         return $(fn_strings_to_lower ${CRKind})Informer.Informer().HasSynced()
       }
-      c.operator = $(fn_strings_to_lower ${CRKind})operator.NewOperator(c.kubeClientSet, c.crClientSet, c.$(fn_strings_to_lower ${CRKind})Lister, c.podLister, c.recorder,c.register)
+      c.operator = $(fn_strings_to_lower ${CRKind})operator.NewOperator(c.kubeClientSet, c.crClientSet, c.$(fn_strings_to_lower ${CRKind})Lister,  c.recorder,c.register)
       return c
     }
 
@@ -1133,7 +1133,7 @@ EOF
 
     func new${CRKind}EventHandler(enqueueFn func(key interface{}), lister crlister${GROUP_VERSION}.${CRKind}Lister)*$(fn_strings_to_lower ${CRKind})EventHandler{
       return &$(fn_strings_to_lower ${CRKind})EventHandler{
-        Lister: lister,
+        $(fn_strings_to_lower ${CRKind})Lister: lister,
         enqueueFn:    enqueueFn,
       }
     }

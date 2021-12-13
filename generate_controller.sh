@@ -508,8 +508,6 @@ function fn_gen_gofile_cmd_project_startcmd() {
       }
       crInformers := buildCustomResourceInformerFactory(crClientSet)
       kubeInformers := buildKubeStandardResourceInformerFactory(kubeClientSet)
-      go crInformers.Start(stopCh)
-      go kubeInformers.Start(stopCh)
 
       register := prometheus.NewRegistry()
       ctx, cancel := context.WithCancel(context.Background())
@@ -528,6 +526,10 @@ function fn_gen_gofile_cmd_project_startcmd() {
 
 
       install.Install(scheme.Scheme)
+
+      // start informers
+      go crInformers.Start(stopCh)
+      go kubeInformers.Start(stopCh)
 
       if err = wg.Wait(); err != nil {
         return err
@@ -692,7 +694,7 @@ function fn_gen_gofile_cmd_project_options_options(){
     
     //
     func(o *Options)AddFlags(fs *pflag.FlagSet){
-      fs.String("web.listen-addr", ":8080", "Address on which to expose metrics and web interfaces")
+      fs.StringVar(&o.ListenAddress,"web.listen-addr", ":8080", "Address on which to expose metrics and web interfaces")
         // todo write your code here
     }
     
@@ -1006,7 +1008,7 @@ function fn_gen_package_pkg_controller_CRKind() {
 
       serviceLister listercorev1.ServiceLister
       $(fn_strings_to_lower ${CRKind})Lister  crlister${GROUP_VERSION}.${CRKind}Lister
-      cacheSynced cache.InformerSynced
+      cacheSynced []cache.InformerSynced
     }
 
 
@@ -1035,22 +1037,28 @@ function fn_gen_package_pkg_controller_CRKind() {
       $(fn_strings_to_lower ${CRKind})Informer := crInformers.$(fn_strings_first_upper $(fn_strings_strip_special_charts ${PROJECT_NAME}))().$(fn_strings_first_upper ${GROUP_VERSION})().${CRKind}s()
       c.$(fn_strings_to_lower ${CRKind})Lister = $(fn_strings_to_lower ${CRKind})Informer.Lister()
       $(fn_strings_to_lower ${CRKind})Informer.Informer().AddEventHandlerWithResyncPeriod(new${CRKind}EventHandler(c.queue.AddRateLimited, c.$(fn_strings_to_lower ${CRKind})Lister), 5*time.Second)
+      c.cacheSynced = append(c.cacheSynced, $(fn_strings_to_lower ${CRKind})Informer.Informer().HasSynced)
 
-      c.cacheSynced = func() bool {
-        return $(fn_strings_to_lower ${CRKind})Informer.Informer().HasSynced()
-      }
       c.operator = $(fn_strings_to_lower ${CRKind})operator.NewOperator(c.kubeClientSet, c.crClientSet, c.$(fn_strings_to_lower ${CRKind})Lister,  c.recorder,c.register)
       return c
     }
 
     func (c *controller) Start(ctx context.Context) error {
       // wait for all involved cached to be synced , before processing items from the queue is started
-      if !cache.WaitForCacheSync(ctx.Done(), c.cacheSynced) {
-        return fmt.Errorf("timeout wait for cache to be synced")
-      }
+      if !cache.WaitForCacheSync(ctx.Done(), func() bool {
+		for _, hasSyncdFn := range c.cacheSynced{
+			if !hasSyncdFn(){
+				return false
+			}
+		}
+		return true
+	}) {
+		return fmt.Errorf("timeout wait for cache to be synced")
+	}
       klog.Info("Starting the workers of the $(fn_strings_to_lower ${CRKind}) controllers")
       go wait.Until(c.runWorker, time.Second, ctx.Done())
-      return nil
+      <- ctx.Done()
+      return ctx.Err()
     }
 
     // runWorker for loop

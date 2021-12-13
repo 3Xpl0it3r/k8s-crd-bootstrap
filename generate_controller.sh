@@ -454,8 +454,8 @@ function fn_gen_gofile_cmd_project_startcmd() {
     func NewStartCommand(stopCh <-chan struct{}) *cobra.Command {
       opts := options.NewOptions()
       cmd := &cobra.Command{
-        Short: "Launch Loki-Operator",
-        Long:  "Launch Loki-Operator",
+        Short: "Launch ${PROJECT_NAME}",
+        Long:  "Launch ${PROJECT_NAME}",
         RunE: func(cmd *cobra.Command, args []string) error {
           if err := opts.Validate(); err != nil {
             return fmt.Errorf("Options validate failed, %v. ", err)
@@ -523,6 +523,8 @@ function fn_gen_gofile_cmd_project_startcmd() {
         panic(err)
       }
       wg.Go(serve(svc, l))
+      // this is example with empty controller, the empty controller do nothing
+      wg.Go(runController(ctx, controller.NewEmptyController(register)))
 
 
       install.Install(scheme.Scheme)
@@ -696,7 +698,7 @@ function fn_gen_gofile_cmd_project_options_options(){
     
     
     func(o *Options)NamedFlagSets()(fs flag.NamedFlagSets){
-      o.AddFlags(fs.FlagSet("loki-operator"))
+      o.AddFlags(fs.FlagSet("$(fn_strings_to_lower ${PROJECT_NAME})"))
       // other options addFlags
       return
     }
@@ -729,7 +731,10 @@ function fn_gen_gofile_pkg_controller_interfaces() {
     */
 
     package controller
-    import "context"
+    import (
+      "context"
+      "github.com/prometheus/client_golang/prometheus"
+    )
 
     // Controller is generic interface for custom controller, it defines the basic behaviour of custom controller
     type Controller interface {
@@ -737,6 +742,25 @@ function fn_gen_gofile_pkg_controller_interfaces() {
       Stop()
       AddHook(hook Hook) error
       RemoveHook(hook Hook) error
+    }
+
+    // this is example, you should remove it in product
+    type emptyController struct {
+    }
+
+    func (e emptyController) Start(ctx context.Context) error {
+      return nil
+    }
+    func (e emptyController) Stop() {
+    }
+    func (e emptyController) AddHook(hook Hook) error {
+      return nil
+    }
+    func (e emptyController) RemoveHook(hook Hook) error {
+      return nil
+    }
+    func NewEmptyController(reg prometheus.Registerer)Controller{
+      return &emptyController{}
     }
 
 EOF
@@ -1008,7 +1032,7 @@ function fn_gen_package_pkg_controller_CRKind() {
       }
       c.queue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
-      $(fn_strings_to_lower ${CRKind})Informer := crInformers.${CRKind}operator().$(fn_strings_first_upper ${GROUP_VERSION})().${CRKind}s()
+      $(fn_strings_to_lower ${CRKind})Informer := crInformers.$(fn_strings_first_upper $(fn_strings_strip_special_charts ${PROJECT_NAME}))().$(fn_strings_first_upper ${GROUP_VERSION})().${CRKind}s()
       c.$(fn_strings_to_lower ${CRKind})Lister = $(fn_strings_to_lower ${CRKind})Informer.Lister()
       $(fn_strings_to_lower ${CRKind})Informer.Informer().AddEventHandlerWithResyncPeriod(new${CRKind}EventHandler(c.queue.AddRateLimited, c.$(fn_strings_to_lower ${CRKind})Lister), 5*time.Second)
 
@@ -1110,12 +1134,10 @@ EOF
 
     import (
       crlister${GROUP_VERSION} "$(fn_project_to_gomod ${PROJECT_NAME})/pkg/client/listers/${GROUP_NAME}/${GROUP_VERSION}"
-      listercorev1 "k8s.io/client-go/listers/core/v1"
-      listterappsv1 "k8s.io/client-go/listers/apps/v1"
     )
 
     type $(fn_strings_to_lower ${CRKind})EventHandler struct {
-      $(fn_strings_to_lower ${CRKind})Lister crlisterv1alpha1.LokiLister
+      $(fn_strings_to_lower ${CRKind})Lister crlisterv1alpha1.${CRKind}Lister
       enqueueFn func(key interface{})
     }
 
@@ -1258,13 +1280,13 @@ function fn_gen_package_pkg_operator_crdoperator() {
       $(fn_strings_to_lower ${CRKind})Client    crclientset.Interface
       kubeClientSet kubernetes.Interface
       recorder      record.EventRecorder
-      $(fn_strings_to_lower ${CRKind})Lister    crlisterv1alpha1.LokiLister
+      $(fn_strings_to_lower ${CRKind})Lister    crlisterv1alpha1.$(fn_strings_first_upper ${CRKind})Lister
       reg           prometheus.Registerer
     }
 
-    func NewOperator(kubeClientSet kubernetes.Interface, crClient crclientset.Interface, $(fn_strings_to_lower ${CRKind})Lister crlisterv1alpha1.LokiLister, recorder record.EventRecorder, reg prometheus.Registerer) croperator.Operator {
+    func NewOperator(kubeClientSet kubernetes.Interface, crClient crclientset.Interface, $(fn_strings_to_lower ${CRKind})Lister crlisterv1alpha1.${CRKind}Lister, recorder record.EventRecorder, reg prometheus.Registerer) croperator.Operator {
       return &operator{
-        crClient:    crClient,
+        $(fn_strings_to_lower ${CRKind})Client:    crClient,
         kubeClientSet: kubeClientSet,
         $(fn_strings_to_lower ${CRKind})Lister:    $(fn_strings_to_lower ${CRKind})Lister,
         reg:           reg,
@@ -1282,7 +1304,7 @@ function fn_gen_package_pkg_operator_crdoperator() {
       if err != nil {
         return handlerError(err)
       }
-      _ = loki
+      _ = $(fn_strings_to_lower ${CRKind})
       // write your code here
       return nil
     }

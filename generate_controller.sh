@@ -493,6 +493,8 @@ function fn_gen_gofile_cmd_project_startcmd() {
     }
 
     func runCommand(o *options.Options, stopCh <-chan struct{}) error {
+      install.Install(scheme.Scheme)
+
       var err error
       restConfig, err := buildKubeConfig("", "")
       if err != nil {
@@ -521,20 +523,29 @@ function fn_gen_gofile_cmd_project_startcmd() {
         panic(err)
       }
       wg.Go(serve(svc, l))
-      // this is example with empty controller, the empty controller do nothing
-      wg.Go(runController(ctx, controller.NewEmptyController(register)))
 
+    // todo concerate controller is here
+    emptyController := controller.NewEmptyController(register)
 
-      install.Install(scheme.Scheme)
 
       // start informers
-      go crInformers.Start(stopCh)
-      go kubeInformers.Start(stopCh)
+      crInformers.Start(stopCh)
+      kubeInformers.Start(stopCh)
 
-      if err = wg.Wait(); err != nil {
-        return err
-      }
-      return nil
+      // this is example with empty controller, the empty controller do nothing
+      wg.Go(runController(ctx, emptyController))
+    
+    select {
+        case <-stopCh:
+            klog.Infof("exited")
+        case <-ctx.Done():
+        }
+        cancel()
+
+        if err = wg.Wait();err !=nil{
+            return err
+        }
+        return nil
     }
 
     func runController(ctx context.Context, controller controller.Controller) func() error {
@@ -1220,6 +1231,8 @@ function fn_gen_package_pkg_operator_interfaces(){
 EOF
     gofmt -w pkg/operator/operator.go
 
+
+
     cat >> pkg/operator/doc.go << EOF
     /*
     Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
@@ -1328,6 +1341,57 @@ function fn_gen_package_pkg_operator_crdoperator() {
 
 EOF
     gofmt -w pkg/operator/$(fn_strings_to_lower ${CRKind})/operator.go
+
+    cat >> pkg/operator/$(fn_strings_to_lower ${CRKind})/util.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
+    package ${RESOURCE_KIND}
+
+    import (
+    crapi${GOVERSION} "$(fn_project_to_gomod)/pkg/apis/${GROUP_NAME}/${GROUP_VERSION}"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    )
+
+    func get$(fn_strings_first_upper ${CRKind})AppName(obj *crapi${GROUP_VERSION}.${CRKind}, target string)string{
+        return obj.GetName() + "-" + target
+    }
+
+
+    // getResourceLabels generate labels according crResource object
+    func getResourceLabels(obj *crapi${GROUP_VERSION}.${CRKind})map[string]string{
+        labels := map[string]string{
+            "app": obj.GetName(),
+            "controller": obj.Kind,
+        }
+        return labels
+    }
+
+    // getResourceAnnotations generate annotations according crResource object
+    func getResourceAnnotations(obj *crapi${GROUP_VERSION}.${CRKind})map[string]string{
+        annotations := map[string]string{}
+        return annotations
+    }
+
+    // getResourceOwnerReference generate OwnerReference according crResource object
+    func getResourceOwnerReference(obj *crapi${GROUP_VERSION}.${CRKind})[]metav1.OwnerReference{
+        ownerReference := []metav1.OwnerReference{}
+        ownerReference = append(ownerReference, *metav1.NewControllerRef(obj, crapi${GROUP_VERSION}.SchemeGroupVersion.WithKind($(fn_strings_to_lower ${CRKind}).Kind)))
+        return ownerReference
+    }
+
+
+EOF
+    gofmt -w pkg/operator/$(fn_strings_to_lower ${CRKind})/utils.go
 }
 
 

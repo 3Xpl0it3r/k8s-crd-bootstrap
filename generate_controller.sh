@@ -1047,7 +1047,7 @@ function fn_gen_package_pkg_controller_CRKind() {
 
       $(fn_strings_to_lower ${CRKind})Informer := crInformers.$(fn_strings_first_upper $(fn_strings_strip_special_charts ${PROJECT_NAME}))().$(fn_strings_first_upper ${GROUP_VERSION})().${CRKind}s()
       c.$(fn_strings_to_lower ${CRKind})Lister = $(fn_strings_to_lower ${CRKind})Informer.Lister()
-      $(fn_strings_to_lower ${CRKind})Informer.Informer().AddEventHandlerWithResyncPeriod(new${CRKind}EventHandler(c.queue.AddRateLimited, c.$(fn_strings_to_lower ${CRKind})Lister), 5*time.Second)
+      $(fn_strings_to_lower ${CRKind})Informer.Informer().AddEventHandlerWithResyncPeriod(new${CRKind}EventHandler(c.enqueueFunc, c.$(fn_strings_to_lower ${CRKind})Lister), 5*time.Second)
       c.cacheSynced = append(c.cacheSynced, $(fn_strings_to_lower ${CRKind})Informer.Informer().HasSynced)
 
       c.operator = $(fn_strings_to_lower ${CRKind})operator.NewOperator(c.kubeClientSet, c.crClientSet, c.$(fn_strings_to_lower ${CRKind})Lister,  c.recorder,c.register)

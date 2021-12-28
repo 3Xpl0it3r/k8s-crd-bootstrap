@@ -1358,7 +1358,7 @@ EOF
     package ${RESOURCE_KIND}
 
     import (
-    crapi${GOVERSION} "$(fn_project_to_gomod)/pkg/apis/${GROUP_NAME}/${GROUP_VERSION}"
+    crapi${GROUP_VERSION} "$(fn_project_to_gomod)/pkg/apis/${GROUP_NAME}/${GROUP_VERSION}"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     )
 
@@ -1388,10 +1388,8 @@ EOF
         ownerReference = append(ownerReference, *metav1.NewControllerRef(obj, crapi${GROUP_VERSION}.SchemeGroupVersion.WithKind($(fn_strings_to_lower ${CRKind}).Kind)))
         return ownerReference
     }
-
-
 EOF
-    gofmt -w pkg/operator/$(fn_strings_to_lower ${CRKind})/utils.go
+    gofmt -w pkg/operator/$(fn_strings_to_lower ${CRKind})/util.go
 }
 
 
@@ -1462,7 +1460,360 @@ echo "Generating client codes ...."
 
 docker run --rm -v "\${REPO_DIR}:/go/src/$(fn_project_to_gomod)" \\
         "\${IMAGE_NAME}" /bin/bash -c "\${cmd}"
+
 EOF
+}
+
+##############################################################################
+#                       测试相关的组件相关的部分                                  #
+##############################################################################
+
+function fn_gen_package_pkg_k8s_testing(){
+    PROJECT_NAME=$(fn_strings_to_lower ${1})
+    GROUP_NAME=$(fn_strings_to_lower ${2})
+    GROUP_VERSION=$(fn_strings_to_lower ${3})
+    RESOURCE_KIND=$(fn_strings_to_lower ${4})  # 资源类型
+    CRKind=$(fn_strings_first_upper ${RESOURCE_KIND})    #CRKind 名称，首字母要大写
+
+    mkdir  -pv pkg/k8s/testing
+    cat >> pkg/k8s/testing/action.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
+
+    package testing
+
+    import (
+        "fmt"
+        apiappsv1 "k8s.io/api/apps/v1"
+        apicorev1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/apimachinery/pkg/runtime/schema"
+        kubediff "k8s.io/apimachinery/pkg/util/diff"
+        k8stest "k8s.io/client-go/testing"
+        "reflect"
+
+        crapi${GROUP_VERSION} "$(fn_project_to_gomod)/pkg/apis/${GROUP_NAME}/${GROUP_VERSION}"
+    )
+
+    // Validate validate action
+    func ActionValidate(expected, actual k8stest.Action) error {
+        if !(expected.Matches(actual.GetVerb(), actual.GetResource().Resource) && actual.GetSubresource() == expected.GetSubresource()) {
+            return fmt.Errorf("Expected\n\t%#v\ngot\n\t%#v", expected, actual)
+        }
+        if reflect.TypeOf(expected) != reflect.TypeOf(actual) {
+            return fmt.Errorf("Actions has wrong type. Expected : %t . Got %t ", expected, actual)
+        }
+
+        switch actAction := actual.(type) {
+        case k8stest.CreateActionImpl:
+            expAction, _ := expected.(k8stest.CreateActionImpl)
+            expObject := expAction.GetObject()
+            actObject := actAction.GetObject()
+            if !reflect.DeepEqual(expObject, actObject) {
+                return fmt.Errorf("Action %s %s has wrong object \n Diff :\n %s", actAction.GetVerb(), actAction.GetResource().Resource, kubediff.ObjectGoPrintSideBySide(expObject, actObject))
+            }
+        case k8stest.UpdateActionImpl:
+            expAction, _ := expected.(k8stest.UpdateActionImpl)
+            expObject := expAction.GetObject()
+            actObject := actAction.GetObject()
+            if !reflect.DeepEqual(expObject, actObject) {
+                return fmt.Errorf("Action %s %s has wrong object \n Diff :\n %s", actAction.GetVerb(), actAction.GetResource().Resource, kubediff.ObjectGoPrintSideBySide(expObject, actObject))
+            }
+        case k8stest.PatchActionImpl:
+            expAction, _ := expected.(k8stest.PatchActionImpl)
+            expPath := expAction.GetPatch()
+            actPatch := actAction.GetPatch()
+            if !reflect.DeepEqual(expPath, actPatch) {
+                return fmt.Errorf("Action %s %s has wrong object \n Diff :\n %s", actAction.GetVerb(), actAction.GetResource().Resource, kubediff.ObjectGoPrintSideBySide(expPath, actPatch))
+            }
+        default:
+            return fmt.Errorf("Uncaptured action %s %s, you should explicity add a case to capture it ", actual.GetVerb(), actual.GetResource().Resource)
+        }
+        return nil
+    }
+
+    // Pod Action Creator
+
+    // ExpectCreatePodAction return pod's CreateAction
+    func ExpectCreatePodAction(pod *apicorev1.Pod)k8stest.Action{
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "pods"}, pod.GetNamespace(), pod)
+    }
+
+    // ExpectUpdatePodAction return pod's UpdateAction
+    func ExpectUpdatePodAction(pod *apicorev1.Pod)k8stest.Action{
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "pods"} , pod.GetNamespace(), pod)
+    }
+
+    // ExpectGetPodAction return pod's GetAction
+    func ExpectGetPodAction(pod *apicorev1.Pod)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "pods"}, pod.GetNamespace(), pod.GetName())
+    }
+
+    // Deployment Action Creator
+
+    // ExpectCreateDeploymentAction return deployment's CreateAction
+    func ExpectCreateDeploymentAction(dpl *apiappsv1.Deployment) k8stest.Action {
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "deployments"}, dpl.GetNamespace(), dpl)
+    }
+
+    // ExpectUpdateDeploymentAction return deployment's UpdateAction
+    func ExpectUpdateDeploymentAction(dpl *apiappsv1.Deployment) k8stest.Action {
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, dpl.GetNamespace(), dpl)
+    }
+
+    // ExpectGetDeploymentAction return deployment's GetAction
+    func ExpectGetDeploymentAction(dpl *apiappsv1.Deployment)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "deployments"}, dpl.GetNamespace(), dpl.GetName())
+    }
+
+    // DaemonSet Action Creator
+
+    // ExpectCreateDaemonSetAction return daemonSet's CreateAction
+    func ExpectCreateDaemonSetAction(ds *apiappsv1.DaemonSet) k8stest.Action {
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "daemonsets"}, ds.GetNamespace(), ds)
+    }
+
+    // ExpectUpdateDaemonSetAction return daemonSet's UpdateAction
+    func ExpectUpdateDaemonSetAction(ds *apiappsv1.DaemonSet) k8stest.Action {
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "daemonsets"}, ds.GetNamespace(), ds)
+    }
+
+    // ExpectGetDaemonSetAction return daemonSet's GetAction
+    func ExpectGetDaemonSetAction(ds *apiappsv1.DaemonSet)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "daemonsets"}, ds.GetNamespace(), ds.GetName())
+    }
+
+    // StatefulSet Action Creator
+
+    // ExpectCreateStatefulSetAction return statefulSet's CreateAction
+    func ExpectCreateStatefulSetAction(sts *apiappsv1.StatefulSet)k8stest.Action{
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "statefulsets"}, sts.GetNamespace(), sts)
+    }
+
+    // ExpectUpdateStatefulSetAction return statefulSet's UpdateAction
+    func ExpectUpdateStatefulSetAction(sts *apiappsv1.StatefulSet)k8stest.Action{
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "statefulsets"}, sts.GetNamespace(), sts)
+    }
+
+    // ExpectGetStatefulSetAction return statefulSet's GetAction
+    func ExpectGetStatefulSetAction(sts *apiappsv1.StatefulSet)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "statefulsets"}, sts.GetNamespace(), sts.GetName())
+    }
+
+    // Service Action Creator
+
+    // ExpectCreateServiceAction return service's CreateAction
+    func ExpectCreateServiceAction(svc *apicorev1.Service) k8stest.Action {
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "services"}, svc.GetNamespace(), svc)
+    }
+
+    // ExpectUpdateServiceAction return service's UpdateAction
+    func ExpectUpdateServiceAction(svc *apicorev1.Service) k8stest.Action {
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "services"}, svc.GetNamespace(), svc)
+    }
+
+    // ExpectGetServiceAction return service's GetAction
+    func ExpectGetServiceAction(svc *apicorev1.Service)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "services"}, svc.GetNamespace(),svc.GetName())
+    }
+
+    // ConfigMap Action Creator
+
+    // ExpectCreateConfigMapAction return create configMap action
+    func ExpectCreateConfigMapAction(cm *apicorev1.ConfigMap) k8stest.Action {
+        return k8stest.NewCreateAction(schema.GroupVersionResource{Resource: "configmaps"}, cm.GetNamespace(), cm)
+    }
+
+    // ExpectUpdateConfigMapAction return update configMap action
+    func ExpectUpdateConfigMapAction(cm *apicorev1.ConfigMap) k8stest.Action {
+        return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "configmaps"}, cm.GetNamespace(), cm)
+    }
+
+    // ExpectGetConfigMapAction return get configMap action
+    func ExpectGetConfigMapAction(cm *apicorev1.ConfigMap)k8stest.Action{
+        return k8stest.NewGetAction(schema.GroupVersionResource{Resource: "configmaps"}, cm.GetNamespace(), cm.GetName())
+    }
+
+    // CustomResource Action Creator
+
+    // for custom resource actions
+    func ExpectUpdateCustomResourceAction(cr runtime.Object)k8stest.Action{
+        switch cr.GetObjectKind().GroupVersionKind().Kind {
+        case "${CRKind}":
+            return k8stest.NewUpdateAction(schema.GroupVersionResource{Resource: "$(fn_strings_to_lower ${CRKind})s"}, cr.(*crapi${GROUP_VERSION}.${CRKind}).GetNamespace(), cr)
+        }
+        return nil
+    }
+
+    func ExpectUpdateCustomResourceStatusAction(cr runtime.Object)k8stest.Action{
+        switch cr.GetObjectKind().GroupVersionKind().Kind {
+        case "${CRKind}":
+            return k8stest.NewUpdateSubresourceAction(schema.GroupVersionResource{Resource: "$(fn_strings_to_lower ${CRKind})"}, "status",cr.(*crapi${GROUP_VERSION}.${CRKind}).GetNamespace(), cr)
+        }
+        return nil
+    }
+EOF
+    gofmt -w pkg/k8s/testing/action.go
+
+    cat >> pkg/k8s/testing/fixture.go << EOF
+    /*
+    Copyright `date "+%Y"` The ${PROJECT_NAME} Authors.
+    Licensed under the Apache License, PROJECT_VERSION 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
+    package testing
+
+    import (
+        "fmt"
+        apiappsv1 "k8s.io/api/apps/v1"
+        apicorev1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/client-go/informers"
+        k8sfake "k8s.io/client-go/kubernetes/fake"
+        k8stest "k8s.io/client-go/testing"
+
+        "$(fn_project_to_gomod)/pkg/operator"
+        crapi${GROUP_VERSION} "$(fn_project_to_gomod)/pkg/apis/${GROUP_NAME}/${GROUP_VERSION}"
+        crinformers "$(fn_project_to_gomod)/pkg/client/informers/externalversions"
+        crfakeclients "$(fn_project_to_gomod)/pkg/client/clientset/versioned/fake"
+    )
+
+    type Fixture struct {
+        kubeClient *k8sfake.Clientset
+        crClient *crfakeclients.Clientset
+
+        // Object to put in the store
+        podLister        []*apicorev1.Pod
+        deploymentLister []*apiappsv1.Deployment
+        statefulSet      []*apiappsv1.StatefulSet
+        daemonSet        []*apiappsv1.DaemonSet
+        serviceLister    []*apicorev1.Service
+        configMapLister  []*apicorev1.ConfigMap
+        // for custom resource
+        customListers    []*runtime.Object
+
+        // todo write your code here
+        kubeInformers informers.SharedInformerFactory
+        crInformers   crinformers.SharedInformerFactory
+
+        // Actions expected to happen on client.
+        kubeActions           []k8stest.Action
+        customResourceActions []k8stest.Action
+
+        // Objects from here preloaded into NewSimpleFake
+        kubeObjects           []runtime.Object
+        customResourceObjects []runtime.Object
+
+        // operator
+        operator operator.Operator
+    }
+
+    func NewFixture(k8sFakeClient *k8sfake.Clientset, crFakeClient *crfakeclients.Clientset,
+        kubeInformers informers.SharedInformerFactory, crInformers crinformers.SharedInformerFactory)*Fixture{
+        return &Fixture{kubeClient: k8sFakeClient, crClient: crFakeClient, kubeInformers: kubeInformers, crInformers: crInformers}
+    }
+
+    func (f *Fixture) AddPodLister(pods ...*apicorev1.Pod) error {
+        for _, pod := range pods {
+            if err := f.kubeInformers.Core().V1().Pods().Informer().GetIndexer().Add(pod); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddDeploymentLister(dpls ...*apiappsv1.Deployment) error {
+        for _, dpl := range dpls {
+            if err := f.kubeInformers.Apps().V1().Deployments().Informer().GetIndexer().Add(dpl); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddStatefulSetLister(sts ...*apiappsv1.StatefulSet) error {
+        for _, st := range sts {
+            if err := f.kubeInformers.Apps().V1().StatefulSets().Informer().GetIndexer().Add(st); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddDaemonSetLister(dss ...*apiappsv1.DaemonSet) error {
+        for _, ds := range dss {
+            if err := f.kubeInformers.Apps().V1().DaemonSets().Informer().GetIndexer().Add(ds); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddServiceLister(svs ...*apicorev1.Service) error {
+        for _, sv := range svs {
+            if err := f.kubeInformers.Core().V1().Services().Informer().GetIndexer().Add(sv); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddConfigMapLister(cms ...*apicorev1.ConfigMap) error {
+        for _, cm := range cms {
+            if err := f.kubeInformers.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cm); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    func (f *Fixture) AddCustomResourceLister(cr runtime.Object) error {
+        f.customResourceObjects = append(f.customResourceObjects, cr)
+        switch cr.GetObjectKind().GroupVersionKind().Kind {
+        default:
+            return fmt.Errorf("Unexpect Custom Resource Type %s %s ", cr.GetObjectKind().GroupVersionKind().Kind, cr.GetObjectKind().GroupVersionKind().GroupVersion())
+        }
+        return nil
+    }
+
+    // add expect actions
+    func(f *Fixture)PutKubeActions(kubeActions  ...k8stest.Action){
+        f.kubeActions = append(f.kubeActions, kubeActions...)
+    }
+
+    func(f *Fixture)PutCustomResourceActions(crActions ...k8stest.Action){
+        f.customResourceActions = append(f.customResourceActions, crActions...)
+    }
+
+
+    func(f *Fixture)GetKubeActions()[]k8stest.Action{
+        return f.kubeActions
+    }
+
+    func(f *Fixture)GetCustomResourceActions()[]k8stest.Action{
+        return f.customResourceActions
+    }
+
+
+EOF
+    gofmt -w pkg/k8s/testing/fixture.go
 }
 
 # 初始化项目
@@ -1502,7 +1853,7 @@ fn_gen_gofile_cmd_project_main  ${PROJECT_NAME}
 fn_gen_gofile_cmd_projct_signals ${PROJECT_NAME}
 # start.go
 fn_gen_gofile_cmd_project_startcmd ${PROJECT_NAME} ${GROUP_NAME} ${PROJECT_VERSION}
-# options
+# options interface
 fn_gen_gofile_cmd_project_options_interface ${PROJECT_NAME}
 # /options
 fn_gen_gofile_cmd_project_options_options ${PROJECT_NAME}
@@ -1512,13 +1863,11 @@ fn_gen_gofile_cmd_project_options_options ${PROJECT_NAME}
 fn_gen_gofile_pkg_controller_interfaces ${PROJECT_NAME}
 # crdcontroller
 fn_gen_package_pkg_controller_CRKind ${PROJECT_NAME} ${GROUP_NAME} ${GROUP_VERSION} ${CRKind}
-
-
-#
 # opetator
 fn_gen_package_pkg_operator_interfaces ${PROJECT_NAME}
 fn_gen_package_pkg_operator_crdoperator  ${PROJECT_NAME} ${GROUP_NAME} ${GROUP_VERSION} ${CRKind}
-
+# test
+fn_gen_package_pkg_k8s_testing ${PROJECT_NAME} ${GROUP_NAME} ${GROUP_VERSION}  ${CRKind}
 
 #
 go mod tidy && go mod vendor
